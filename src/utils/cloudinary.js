@@ -24,3 +24,6 @@ cloudinary.config({
         fs.unlinkSync(localfilepath)  //remove the locally saved file when the operation is got failed 
     }
   }
+
+
+export {uploadoncloudinary}
