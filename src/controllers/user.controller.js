@@ -21,7 +21,7 @@ const registeruser = asynchandler(async (req,res)=>{
     if([fullname,email,username,password].some((field)=> field?.trim()==="")) {
         throw new ApiError(400,"all fields are required")
     }
-    const existeduser = user.findOne(
+    const existeduser = await user.findOne(
         {
             $or:[{username},{email}]
         }
@@ -31,17 +31,22 @@ const registeruser = asynchandler(async (req,res)=>{
         throw new ApiError(409,"user already registered")
     }
 
+    const avatarlocalpath =req.files?.avatar[0]?.path;
+    // const coverimagelocalpath =req.files?.coverimage[0]?.path;
 
-    const avatarlocalpath = req.files?.avatar[0]?.path;
-    const coverimagelocalpath=req.files?.coverimage[0]?.path;
+    let coverimagelocalpath;
 
+    if (req.files && Array.isArray(req.files.coverimage) && req.files.coverimage.lenght > 0) {
+        coverimagelocalpath = req.files.coverimage[0].path   
+    }
+     
+    // console.log(avatarlocalpath);
     if (!avatarlocalpath) {
         throw new ApiError(400,"avatar is required")
     }
-
-    const avatar =await uploadoncloudinary(avatarlocalpath)
-    const coverimage =await uploadoncloudinary(coverimagelocalpath)
-
+    
+    const avatar =await uploadoncloudinary(avatarlocalpath);
+    const coverimage =await uploadoncloudinary(coverimagelocalpath);
 
     if (!avatar) {
         throw new ApiError(400,"avatar file is required")
@@ -55,17 +60,15 @@ const registeruser = asynchandler(async (req,res)=>{
         password,
         username: username.toLowerCase()
     })
-
-    const createduser = User.findById(user._id).select(
-        "-password -refreshToken"
-    )    
+    // console.log( user.findById(await user._id).select("-password -refreshToken"));
+    const createduser =await user.findById( User._id).select("-password -refreshToken");    
 
     if (!createduser) {
         throw new ApiError(500,"something went wrong while registering the user")
     }
 
     return res.status(201).json(
-        new ApiResponse(200,createduser,"user registereg sucessfully")
+        new ApiResponse(200,createduser,"user registered sucessfully")
     )
 
 })

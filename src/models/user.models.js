@@ -12,7 +12,7 @@ const userschema= new mongoose.Schema({
         index:true
         
     },
-    Email:{
+    email:{
         type: String,
         required: true,
         unique:true,
@@ -31,7 +31,7 @@ const userschema= new mongoose.Schema({
         
     },
     coverimage:{
-        type : Number,
+        type : String,
        
     },
     watchhistory:{
@@ -47,7 +47,7 @@ const userschema= new mongoose.Schema({
 
     }
 
-},{timeseries:true})
+},{timestamps:true})
 
 userschema.pre("save",async function (next){
     if (!this.isModified("password")) return next() 
