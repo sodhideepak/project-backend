@@ -15,14 +15,14 @@ const verifyJWT= asynchandler(async(req,_,next)=>{
     
         const decodedtoken= Jwt.verify(token,process.env.Access_Token_Secret)
     
-        const user = await user.findById(decodedtoken?._id).select("-password -refreshtoken")
+        const User = await user.findById(decodedtoken?._id).select("-password -refreshtoken")
     
-        if (!user) {
+        if (!User) {
             throw new ApiError(401,"invalid access token")
             
         }
     
-        req.user =user;
+        req.user =User;
         next()
     
     } catch (error) {

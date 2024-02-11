@@ -1,17 +1,23 @@
 import { asynchandler } from "../utils/asynchandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { user } from "../models/user.models.js";
+// import bcrypt from "bcrypt";
+// import mongoose from "mongoose";
 import { uploadoncloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const generateAccessAndRefreshTokens=async(userid)=>{
     try {
-        const user = await user.findById(userid)
-        const accesstoken = user.generateAccessToken()
-        const refreshtoken = user.generateRefreshToken()
+        const User = await user.findById(userid)
+        console.log(User);
+        const accesstoken = User.generateAccessToken()
+        const refreshtoken = User.generateRefreshToken()
+        // console.log(refreshtoken);
+        user.refreshToken=refreshtoken
+        console.log("1 :",user.refreshToken);
+        console.log("2 :",refreshtoken);
+        await User.save({ validateBeforeSave: false })
 
-        user.refreshtoken=refreshToken
-        await user.save({validateBeforeSave:false})
 
         return{accesstoken,refreshtoken}
     
@@ -50,19 +56,22 @@ const registeruser = asynchandler(async (req,res)=>{
     const avatarlocalpath =req.files?.avatar[0]?.path;
     // const coverimagelocalpath =req.files?.coverimage[0]?.path;
 
-    let coverimagelocalpath;
 
-    if (req.files && Array.isArray(req.files.coverimage) && req.files.coverimage.lenght > 0) {
-        coverimagelocalpath = req.files.coverimage[0].path   
+    let coverimageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) || req.files.coverimage.length > 0) {
+        coverimageLocalPath = req.files.coverimage[0].path
     }
-     
+    //  console.log("1",Array.isArray(req.files.coverimage));
+    //  console.log("2",req.files);
+    //  console.log("3",req.files.coverimage.Lenght > 0);
+    // console.log("coverimage :",coverimageLocalPath);
     // console.log(avatarlocalpath);
     if (!avatarlocalpath) {
         throw new ApiError(400,"avatar is required")
     }
     
     const avatar =await uploadoncloudinary(avatarlocalpath);
-    const coverimage =await uploadoncloudinary(coverimagelocalpath);
+    const coverimage =await uploadoncloudinary(coverimageLocalPath);
 
     if (!avatar) {
         throw new ApiError(400,"avatar file is required")
@@ -74,7 +83,8 @@ const registeruser = asynchandler(async (req,res)=>{
         coverimage:coverimage?.url || "",
         email,
         password,
-        username: username.toLowerCase()
+        username: username.toLowerCase(),
+
     })
     // console.log( user.findById(await user._id).select("-password -refreshToken"));
     const createduser =await user.findById( User._id).select("-password -refreshToken");    
@@ -99,30 +109,38 @@ const loginuser = asynchandler(async (req,res)=>{
     // generate refresh and acess tokens
     // send cookie
 
-    const {email,username,password} = req.body
-
-    if (!email || !username) {
+    const {email,username,password}= req.body
+    console.log("email =",email);
+    
+    console.log(email,username,password);
+    if (!email && !username) {
         throw new ApiError(400,"username or email is required")     
     }
 
-    const user = await user.findOne({
+    const User = await user.findOne({
         $or:[ {username},{email}]
     })
 
-    if (!user) {
+    if (!User) {
         throw new ApiError(400, "user does not exist")
         
     }
+    // console.log(User._id);
+    
 
-    const ispasswordvalid= await user.isPasswordCorrect(password)
+    
+    const ispasswordvalid= await User.isPasswordcorrect(password)
+    // console.log(ispasswordvalid);
     if (!ispasswordvalid) {
+
         throw new ApiError(400,"invlid user credientials")
         
-    }
+    } 
 
-    const {accesstoken,refreshtoken} = await generateAccessAndRefreshTokens(user._id)
+    const {accesstoken,refreshtoken} = await generateAccessAndRefreshTokens(User._id)
 
-    const loggedinuser =await user.findById( User._id).select("-password -refreshToken");    
+    const loggedinuser =await user.findById( User._id).select("-password -refreshToken");
+    // console.log(loggedinuser);    
 
     const options={
         httpOnly:true,
