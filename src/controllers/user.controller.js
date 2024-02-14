@@ -5,6 +5,7 @@ import { user } from "../models/user.models.js";
 // import mongoose from "mongoose";
 import { uploadoncloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import jwt from "jsonwebtoken"
 
 const generateAccessAndRefreshTokens=async(userid)=>{
     try {
@@ -13,9 +14,9 @@ const generateAccessAndRefreshTokens=async(userid)=>{
         const accesstoken = User.generateAccessToken()
         const refreshtoken = User.generateRefreshToken()
         // console.log(refreshtoken);
-        user.refreshToken=refreshtoken
-        console.log("1 :",user.refreshToken);
-        console.log("2 :",refreshtoken);
+        User.refreshToken=refreshtoken
+        // console.log("1 :",User.refreshtoken);
+        // console.log("2 :",refreshtoken);
         await User.save({ validateBeforeSave: false })
 
 
@@ -161,14 +162,15 @@ const loginuser = asynchandler(async (req,res)=>{
     )
 
 })
+// const User = await user.findById(req.user._id)
+// await User.save({ validateBeforeSave: false })
 
 
 const logout =asynchandler(async(req,res)=>{
-
-    user.findByIdAndUpdate(
+    await user.findByIdAndUpdate(
         req.user._id,{
-            $set:{
-                refreshToken:undefined
+            $unset: {
+                refreshToken: 1 // this removes the field from document
             },
            
         },
@@ -176,6 +178,9 @@ const logout =asynchandler(async(req,res)=>{
             new:true
         }
     )
+    
+    console.log(req.user._id?.refreshToken);
+    
 
     const options={
         httpOnly:true,
@@ -197,4 +202,70 @@ const logout =asynchandler(async(req,res)=>{
 })
 
 
-export {registeruser,loginuser,logout}
+
+const refreshAccessToken = asynchandler(async(req,res)=>{
+    // console.log("req.body : ",req.body);
+
+    // const incomingrefreshtoken = req.cookies.refreshToken || req.body.refreshToken
+    const incomingrefreshtoken = req.body.refreshToken || req.cookies.refreshToken
+    
+    if(!incomingrefreshtoken){
+        throw new ApiError(401,"unauthorized request")
+    }
+    
+    try {
+        const decodedtoken = jwt.verify(
+            incomingrefreshtoken,
+            process.env.Refresh_Token_Secret
+        )
+    
+        // console.log("decodedtoken : ",decodedtoken);
+        // console.log("decodedtoken id : ",decodedtoken?._id);
+        const User = await user.findById(decodedtoken?._id)
+        
+        // console.log(User);
+        if(!user){
+            throw new ApiError(401,"invalid refresh token")
+        }
+        
+        // console.log("incomminrefreshtoken : ",incomingrefreshtoken);
+        console.log("User?.refreshToken : ",User?.refreshToken);
+
+        if(incomingrefreshtoken !== User?.refreshToken){
+            throw new ApiError(401,"refresh token is expired or used")
+        }
+    
+        const options ={
+            httpOnly:true,
+            secure:true
+        }
+    
+        const {accesstoken,refreshtoken}=await generateAccessAndRefreshTokens(decodedtoken?._id)
+
+        // console.log("newrefreshtoken : ",refreshtoken);
+        // console.log("accesstoken : ",accesstoken);
+    
+        return res.status(200)
+        .cookie("accesstoken",accesstoken,options)
+        .cookie("refreshtoken",refreshtoken,options)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    accesstoken, refreshtoken:refreshtoken
+                },
+                "access token refreshed sucessfully"
+            )
+        )
+    
+    } catch (error) {
+        throw new ApiError(401,error?.message || "invalid refresh token")
+    }
+})
+
+
+export {
+        registeruser,
+        loginuser,
+        logout,
+        refreshAccessToken}
